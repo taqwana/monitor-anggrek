@@ -1,0 +1,9 @@
+{
+  "appId": "id.kantoranggrek.app",
+  "appName": "Kantor Anggrek",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "http",
+    "cleartext": true
+  }
+}
