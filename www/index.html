@@ -146,7 +146,9 @@ details{font-size:13px}summary{cursor:pointer;font-weight:700;font-size:15px}
 /* ===== PENGATURAN (ubah di sini) ===== */
 const CONFIG={
   JUMLAH_ZONA:8,
-  DURASI_ZONA_DETIK:240,   // 4 menit per zona (di alat ada overlap 20 detik antar zona)
+  DURASI_ZONA_DETIK:240,   // 4 menit per zona
+  OVERLAP_DETIK:20,        // zona berikutnya mulai 20 detik sebelum zona sebelumnya mati
+  URUTAN_ZONA:[8,7,6,5,4,3,2,1],  // urutan penyiraman (sama dengan alat)
   KECEPATAN_SIM:60,        // 60 = 1 detik nyata mewakili 1 menit waktu sistem
   AMBANG_MULAI_LEMBAP:40,  // simulasi: siklus mulai otomatis di bawah nilai ini (%)
   TUNDA_JIKA_HUJAN:true    // simulasi: siklus ditunda selama sensor hujan aktif
@@ -273,18 +275,20 @@ function anomaly(a){
 
 /* ===== SIMULASI ===== */
 function startCycle(){
-  if(sim.run)return;resetChips();sim.run=true;sim.zone=1;sim.left=CONFIG.DURASI_ZONA_DETIK;
-  log('Siklus dimulai');setZone(1,true);
+  if(sim.run)return;resetChips();sim.run=true;sim.cyc=0;log('Siklus dimulai');simZones();
+}
+function simZones(){  /* nyalakan/matikan zona menurut waktu siklus, dengan overlap */
+  const D=CONFIG.DURASI_ZONA_DETIK,iv=D-CONFIG.OVERLAP_DETIK,U=CONFIG.URUTAN_ZONA;let nw=-1;
+  U.forEach((z,i)=>{const on=sim.cyc>=i*iv&&sim.cyc<i*iv+D;if(on)nw=i;setZone(z,on);});
+  if(nw>=0)sim.left=D-(sim.cyc-nw*iv);
+  if(sim.cyc>=(U.length-1)*iv+D){sim.run=false;sim.cyc=0;}
 }
 function stopCycle(){sim.run=false;sim.zone=0;for(let i=1;i<=N;i++)setZone(i,false);}
 function simTick(){
   const dtR=.25,dt=CONFIG.KECEPATAN_SIM*dtR;
   sim.m=Math.max(15,Math.min(90,sim.m+((sim.run?1.2:0)+(sim.rain?0.8:0)-0.5)*dt/60));
   if(sim.rain){sim.rainT-=dtR;if(sim.rainT<=0)sim.rain=false;}else if(Math.random()<0.002){sim.rain=true;sim.rainT=14;}
-  if(sim.run){sim.left-=dt;
-    if(sim.left<=0){const z=sim.zone;setZone(z,false);
-      if(z<N){sim.zone++;sim.left=CONFIG.DURASI_ZONA_DETIK;setZone(sim.zone,true);}
-      else{sim.run=false;sim.zone=0;}}}
+  if(sim.run){sim.cyc+=dt;simZones();}
   const noise=(Math.random()-.5)*1.2;
   sim.t=28+3*Math.sin(Date.now()/20000);sim.h=Math.min(99,72-(sim.t-28)*3+(sim.rain?12:0));
   const tr={tanah:sim.m,dht:sim.t,hujan:sim.rain?1:0},rd={};
